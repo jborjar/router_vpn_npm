@@ -4,7 +4,7 @@ Stack de Docker para enrutamiento de tráfico a través de VPN con alta disponib
 
 ## Arquitectura
 
-![Diagrama de Arquitectura](./router_vpn_npm.png)## Características
+![Diagrama de Arquitectura](./images/router_vpn_npm.png)## Características
 
 - **Split Tunneling**: Solo el tráfico a redes corporativas va por VPN
 - **NAT para Internet**: El router hace MASQUERADE para tráfico a internet (via gateway Docker)
