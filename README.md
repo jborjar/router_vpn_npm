@@ -5,43 +5,42 @@ Stack de Docker para enrutamiento de tráfico a través de VPN con alta disponib
 ## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            APLICACIONES                                      │
-│                    (cualquier contenedor en vpn-proxy)                       │
-└─────────────────────────────────┬───────────────────────────────────────────┘
-                                  │ default via 172.19.50.1
-                                  │ (inyectado por route-injector)
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    ROUTER INTELIGENTE (172.19.50.1)                          │
-│                         Split Tunneling                                      │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │  NPM_LAN_ROUTES (10.177.0.0/16, etc.) → VIP (VPN) o Gateway Docker  │    │
-│  │  default (internet)                   → Gateway Docker (directo)    │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                    Monitorea VIP cada 30s para fallback                      │
-└─────────────────────────────────┬───────────────────────────────────────────┘
-                                  │
-                ┌─────────────────┴─────────────────┐
-                │                                   │
-                ▼                                   ▼
-┌───────────────────────────────┐     ┌───────────────────────────────┐
-│     VIP 172.19.50.254         │     │    Gateway Docker             │
-│       (Keepalived)            │     │     172.19.50.200             │
-│                               │     │                               │
-│  ┌───────────┐ ┌───────────┐  │     │      INTERNET                 │
-│  │ WireGuard │ │ Fortinet  │  │     │      DIRECTO                  │
-│  │  MASTER   │ │  BACKUP   │  │     │   (IP pública real)           │
-│  │  P:100    │ │   P:50    │  │     │                               │
-│  └───────────┘ └───────────┘  │     └───────────────────────────────┘
-└───────────────────────────────┘
-         │
-         ▼
-   Redes Corporativas
-   (via VPN)
-```
+```mermaid
+graph TD
+    API["🔌 APLICACIONES<br/>cualquier contenedor<br/>en vpn-proxy"]
 
-## Componentes
+    ROUTER["🌐 ROUTER<br/>INTELIGENTE<br/>172.19.50.1<br/>Split Tunneling"]
+
+    VIP["🔐 VIP<br/>172.19.50.254<br/>Keepalived"]
+    GATEWAY["🚀 Gateway Docker<br/>172.19.50.200"]
+
+    WG["🔒 WireGuard<br/>MASTER<br/>P:100"]
+    FORT["🔒 Fortinet<br/>BACKUP<br/>P:50"]
+
+    INTERNET["🌍 INTERNET<br/>IP pública real"]
+    REDES["🏢 Redes<br/>Corporativas<br/>via VPN"]
+
+    API -->|default via 172.19.50.1<br/>route-injector| ROUTER
+
+    ROUTER -->|NPM_LAN_ROUTES<br/>10.177.0.0/16| VIP
+    ROUTER -->|default internet| GATEWAY
+
+    VIP --> WG
+    VIP --> FORT
+    WG --> REDES
+    FORT --> REDES
+
+    GATEWAY --> INTERNET
+
+    style API fill:#4a5568,stroke:#2d3748,color:#fff
+    style ROUTER fill:#2b6cb0,stroke:#1e4e8a,color:#fff
+    style VIP fill:#c05621,stroke:#a0410a,color:#fff
+    style GATEWAY fill:#22543d,stroke:#1a3a2a,color:#fff
+    style WG fill:#553c9a,stroke:#44337a,color:#fff
+    style FORT fill:#553c9a,stroke:#44337a,color:#fff
+    style INTERNET fill:#1a365d,stroke:#0f2342,color:#fff
+    style REDES fill:#276749,stroke:#22543d,color:#fff
+```## Componentes
 
 | Servicio | IP | Descripción |
 |----------|-----|-------------|
@@ -380,3 +379,4 @@ docker exec router ping -c 1 172.19.50.254
 ## Licencia
 
 MIT
+
