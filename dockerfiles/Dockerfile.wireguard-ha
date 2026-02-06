@@ -1,0 +1,18 @@
+FROM qmcgaw/gluetun:v3.38.0
+
+# Instalar keepalived y herramientas necesarias
+RUN apk add --no-cache \
+    iptables \
+    tcpdump \
+    keepalived \
+    bash \
+    gettext
+
+# Copiar scripts
+COPY scripts/start_wireguard-ha.sh /start.sh
+COPY scripts/keepalived-wireguard.conf.template /etc/keepalived/keepalived.conf.template
+COPY scripts/check_vpn.sh /check_vpn.sh
+
+RUN sed -i 's/\r$//' /start.sh /check_vpn.sh && chmod +x /start.sh /check_vpn.sh
+
+ENTRYPOINT ["/start.sh"]

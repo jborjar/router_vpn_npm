@@ -1,0 +1,26 @@
+FROM jc21/nginx-proxy-manager:latest
+
+# Instalar herramientas de red
+RUN apt-get update && apt-get install -y \
+    locales \
+    tzdata \
+    iputils-ping \
+    netcat-openbsd \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configurar zona horaria
+ENV TZ=America/Mexico_City
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Configurar locale
+RUN sed -i 's/# es_MX.UTF-8 UTF-8/es_MX.UTF-8 UTF-8/' /etc/locale.gen && \
+    locale-gen es_MX.UTF-8
+ENV LANG=es_MX.UTF-8
+ENV LANGUAGE=es_MX:es
+ENV LC_ALL=es_MX.UTF-8
+
+COPY scripts/start_npm.sh /start.sh
+RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
+
+ENTRYPOINT ["/start.sh"]
