@@ -54,6 +54,7 @@ Stack de Docker para enrutamiento de tráfico a través de VPN con alta disponib
 ## Características
 
 - **Split Tunneling**: Solo el tráfico a redes corporativas va por VPN
+- **NAT para Internet**: El router hace MASQUERADE para tráfico a internet (via gateway Docker)
 - **Alta Disponibilidad**: Failover automático (~5s) entre WireGuard y Fortinet via Keepalived
 - **Router Inteligente**: Si las VPNs no responden, el tráfico va por gateway directo (útil dentro de red corporativa)
 - **Inyección automática de rutas**: Los contenedores no necesitan `NET_ADMIN`
@@ -371,6 +372,7 @@ docker exec router ping -c 1 172.19.50.254
 
 ## Notas técnicas
 
+- **NAT en Router**: El router aplica MASQUERADE solo para tráfico a internet (`! -d 172.19.50.0/24`). El tráfico a VPN no necesita NAT aquí porque lo hace el VPN gateway.
 - **Fortinet usa OpenConnect**: Se usa `openconnect --protocol=fortinet` en lugar de openfortivpn porque no requiere el módulo PPP del kernel (común en servidores cloud)
 - **Interfaz TUN**: Ambas VPNs usan `tun0` (no ppp0)
 - **Keepalived robusto**: Los scripts limpian archivos PID al inicio y monitorean keepalived cada 10s con reinicio automático

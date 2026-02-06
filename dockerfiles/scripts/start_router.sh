@@ -54,10 +54,15 @@ set_direct_routes() {
     fi
 }
 
-# Solo forwarding, sin NAT
+# Configurar iptables
 iptables -t nat -F POSTROUTING 2>/dev/null || true
 iptables -F FORWARD 2>/dev/null || true
 iptables -P FORWARD ACCEPT
+
+# NAT para trafico que va a internet (via gateway Docker)
+# El trafico a VPN no necesita NAT aqui (lo hace el VPN gateway)
+iptables -t nat -A POSTROUTING -o eth0 ! -d 172.19.50.0/24 -j MASQUERADE
+echo "NAT configurado para trafico a internet"
 
 # Verificación inicial - esperar un poco a que las VPNs arranquen
 echo "Esperando inicio de VPNs (30s)..."
