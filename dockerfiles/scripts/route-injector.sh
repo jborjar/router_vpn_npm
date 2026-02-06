@@ -7,12 +7,15 @@ set -e
 
 NETWORK="${NETWORK_NAME:-vpn-proxy}"
 ROUTER_IP="${ROUTER_IP:-172.19.50.1}"
+# Rutas VPN a inyectar (en lugar de cambiar default route)
+VPN_ROUTES="${NPM_LAN_ROUTES:-}"
 # Contenedores a excluir (infraestructura)
 EXCLUDE_CONTAINERS="${EXCLUDE_CONTAINERS:-router,wireguard_gw,fortinet_gw,route-injector}"
 
 echo "=== Route Injector ==="
 echo "Red monitoreada: $NETWORK"
 echo "Router IP: $ROUTER_IP"
+echo "Rutas VPN: $VPN_ROUTES"
 echo "Contenedores excluidos: $EXCLUDE_CONTAINERS"
 echo ""
 
@@ -47,6 +50,7 @@ inject_route() {
         return 0
     fi
 
+
     # Verificar si el contenedor esta en la red objetivo
     local in_network
     in_network=$(docker inspect -f "{{index .NetworkSettings.Networks \"${NETWORK}\"}}" "$container_id" 2>/dev/null)
@@ -65,7 +69,7 @@ inject_route() {
         return 1
     fi
 
-    # Inyectar ruta usando nsenter
+    # Inyectar rutas VPN usando nsenter
     echo "[INJECT] $container_name (PID: $pid)"
 
     # Verificar que el proceso existe
@@ -74,17 +78,31 @@ inject_route() {
         return 1
     fi
 
-    # Intentar inyectar la ruta
-    if nsenter -t "$pid" -n ip route replace default via "$ROUTER_IP" 2>&1; then
-        echo "[OK] $container_name: Ruta inyectada correctamente"
-        nsenter -t "$pid" -n ip route show default 2>/dev/null | sed 's/^/       /'
+    # Verificar si hay rutas VPN configuradas
+    if [ -z "$VPN_ROUTES" ]; then
+        echo "[WARN] $container_name: No hay VPN_ROUTES configuradas"
+        return 0
+    fi
+
+    # Inyectar cada ruta VPN (no cambiamos default, solo agregamos rutas especificas)
+    local success=true
+    echo "$VPN_ROUTES" | tr ',' '\n' | while read -r route; do
+        route=$(echo "$route" | tr -d ' ')
+        if [ -n "$route" ]; then
+            if nsenter -t "$pid" -n ip route replace "$route" via "$ROUTER_IP" 2>&1; then
+                echo "       + $route via $ROUTER_IP"
+            else
+                echo "       ! Error agregando $route"
+                success=false
+            fi
+        fi
+    done
+
+    if [ "$success" = true ]; then
+        echo "[OK] $container_name: Rutas VPN inyectadas"
         return 0
     else
-        local err=$?
-        echo "[ERROR] $container_name: Fallo nsenter (codigo: $err)"
-        # Intentar mostrar mas info
-        echo "       Verificando /proc/$pid/ns/net:"
-        ls -la "/proc/$pid/ns/net" 2>&1 | sed 's/^/       /' || true
+        echo "[WARN] $container_name: Algunas rutas fallaron"
         return 1
     fi
 }
