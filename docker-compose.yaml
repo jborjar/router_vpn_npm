@@ -179,7 +179,7 @@ services:
       vpn-proxy:
         ipv4_address: ${FORTINET_IP}
     healthcheck:
-      test: ["CMD", "sh", "-c", "ping -c 1 -W 2 $${HEALTH_CHECK_IP:-8.8.8.8} > /dev/null 2>&1"]
+      test: ["CMD", "sh", "-c", "ip link show tun0 > /dev/null 2>&1 && ip addr show tun0 | grep -q 'inet '"]
       interval: 10s
       timeout: 5s
       retries: 3

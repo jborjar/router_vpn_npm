@@ -134,7 +134,7 @@ OPENCONNECT_OPTS="--protocol=fortinet"
 OPENCONNECT_OPTS="$OPENCONNECT_OPTS --user=$FORTICLIENT_USER"
 OPENCONNECT_OPTS="$OPENCONNECT_OPTS --passwd-on-stdin"
 OPENCONNECT_OPTS="$OPENCONNECT_OPTS --interface=$VPN_INTERFACE"
-OPENCONNECT_OPTS="$OPENCONNECT_OPTS --verbose"
+# OPENCONNECT_OPTS="$OPENCONNECT_OPTS --verbose"  # Descomentar para debug
 
 # Certificado - openconnect acepta formato pin-sha256:xxx
 if [ -n "$FORTICLIENT_TRUSTED_CERT" ]; then
