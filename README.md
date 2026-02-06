@@ -4,53 +4,7 @@ Stack de Docker para enrutamiento de tráfico a través de VPN con alta disponib
 
 ## Arquitectura
 
-```
-```mermaid
-graph TD
-    API["🔌 APLICACIONES<br/>cualquier contenedor<br/>en vpn-proxy"]
-
-    ROUTER["🌐 ROUTER<br/>INTELIGENTE<br/>172.19.50.1<br/>Split Tunneling"]
-
-    VIP["🔐 VIP<br/>172.19.50.254<br/>Keepalived"]
-    GATEWAY["🚀 Gateway Docker<br/>172.19.50.200"]
-
-    WG["🔒 WireGuard<br/>MASTER<br/>P:100"]
-    FORT["🔒 Fortinet<br/>BACKUP<br/>P:50"]
-
-    INTERNET["🌍 INTERNET<br/>IP pública real"]
-    REDES["🏢 Redes<br/>Corporativas<br/>via VPN"]
-
-    API -->|default via 172.19.50.1<br/>route-injector| ROUTER
-
-    ROUTER -->|NPM_LAN_ROUTES<br/>10.177.0.0/16| VIP
-    ROUTER -->|default internet| GATEWAY
-
-    VIP --> WG
-    VIP --> FORT
-    WG --> REDES
-    FORT --> REDES
-
-    GATEWAY --> INTERNET
-
-    style API fill:#4a5568,stroke:#2d3748,color:#fff
-    style ROUTER fill:#2b6cb0,stroke:#1e4e8a,color:#fff
-    style VIP fill:#c05621,stroke:#a0410a,color:#fff
-    style GATEWAY fill:#22543d,stroke:#1a3a2a,color:#fff
-    style WG fill:#553c9a,stroke:#44337a,color:#fff
-    style FORT fill:#553c9a,stroke:#44337a,color:#fff
-    style INTERNET fill:#1a365d,stroke:#0f2342,color:#fff
-    style REDES fill:#276749,stroke:#22543d,color:#fff
-```## Componentes
-
-| Servicio | IP | Descripción |
-|----------|-----|-------------|
-| **router** | 172.19.50.1 | Gateway inteligente con split tunneling y fallback |
-| **route-injector** | host | Inyecta rutas automáticamente a contenedores |
-| **wireguard_gw** | 172.19.50.253 | VPN WireGuard/Gluetun (MASTER, prioridad 100) |
-| **fortinet_gw** | 172.19.50.252 | VPN Fortinet/OpenConnect (BACKUP, prioridad 50) |
-| **npm** | 172.19.50.250 | Nginx Proxy Manager |
-
-## Características
+![Diagrama de Arquitectura](./router_vpn_npm.png)## Características
 
 - **Split Tunneling**: Solo el tráfico a redes corporativas va por VPN
 - **NAT para Internet**: El router hace MASQUERADE para tráfico a internet (via gateway Docker)
@@ -379,4 +333,5 @@ docker exec router ping -c 1 172.19.50.254
 ## Licencia
 
 MIT
+
 
