@@ -1,26 +1,44 @@
-# Archivos de configuracion con credenciales
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Entornos virtuales
+venv/
+env/
+
+# Archivos de configuración con credenciales
 .env
 
-# Datos persistentes
+# Datos persistentes (Docker stacks)
 stack_data/
 
-# Archivos especificos de la maquina
+# Archivos específicos de la máquina
 STATUS.md
 AUDIT.md
 
-# Logs
+# Tests con credenciales locales
+*tests*
+
+# Logs y temporales
 *.log
+*.tmp
+*.swp
+*.swo
+*~
 
 # Archivos de sistema
 .DS_Store
 Thumbs.db
 
-# Archivos temporales
-*.tmp
-*.swp
-*~
-
-# IDE
+# IDE y herramientas
 .vscode/
 .idea/
 *.code-workspace
