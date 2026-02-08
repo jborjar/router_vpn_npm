@@ -1,0 +1,32 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependencias necesarias incluyendo keepalived
+# Usa openconnect (no requiere módulo PPP del kernel)
+RUN apt-get update && apt-get install -y \
+    wget \
+    net-tools \
+    iproute2 \
+    iptables \
+    openconnect \
+    curl \
+    tcpdump \
+    iputils-ping \
+    procps \
+    vpnc-scripts \
+    keepalived \
+    gettext-base \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear directorios necesarios
+RUN mkdir -p /var/log/forticlient /etc/keepalived
+
+# Copiar scripts
+COPY scripts/start_fortinet-ha.sh /start.sh
+COPY scripts/keepalived-fortinet.conf.template /etc/keepalived/keepalived.conf.template
+COPY scripts/check_vpn.sh /check_vpn.sh
+
+RUN sed -i 's/\r$//' /start.sh /check_vpn.sh && chmod +x /start.sh /check_vpn.sh
+
+ENTRYPOINT ["/start.sh"]

@@ -1,0 +1,241 @@
+services:
+  # =============================================================
+  # Router Gateway - Punto de entrada para todas las apps
+  # =============================================================
+  router:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.router
+    image: jbr_router
+    container_name: router
+    hostname: router
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      - GATEWAY_VIP=${KEEPALIVED_VIP}
+      - NPM_LAN_ROUTES=${NPM_LAN_ROUTES:-}
+    depends_on:
+      - wireguard_gw
+      - fortinet_gw
+    networks:
+      vpn-proxy:
+        ipv4_address: ${ROUTER_IP}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip route | grep -q 'via ${KEEPALIVED_VIP:-172.19.50.254}'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+
+  # =============================================================
+  # Route Injector - Inyecta rutas automaticamente
+  # =============================================================
+  route-injector:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.route-injector
+    image: jbr_route-injector
+    container_name: route-injector
+    hostname: route-injector
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NETWORK_NAME=vpn-proxy
+      - ROUTER_IP=${ROUTER_IP}
+      - NPM_LAN_ROUTES=${NPM_LAN_ROUTES}
+      - EXCLUDE_CONTAINERS=router,wireguard_gw,fortinet_gw,route-injector,npm
+    depends_on:
+      - router
+    healthcheck:
+      test: ["CMD", "sh", "-c", "pgrep -f route-injector.sh > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+
+  # =============================================================
+  # WireGuard VPN Gateway - MASTER (Prioridad 100)
+  # =============================================================
+  wireguard_gw:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.wireguard-ha
+    image: jbr_wireguard-ha
+    container_name: wireguard_gw
+    hostname: wireguard_gw
+    labels:
+      - vpn.role=master
+      - vpn.type=wireguard
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      # Zona horaria
+      - TZ=${TZ}
+      # WireGuard / Gluetun
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      - WIREGUARD_ENDPOINT_IP=${VPN_ENDPOINT}
+      - WIREGUARD_ENDPOINT_PORT=${VPN_PORT}
+      - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_PRESHARED_KEY=${WIREGUARD_PRESHARED_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      # Keepalived - MASTER
+      - KEEPALIVED_STATE=MASTER
+      - KEEPALIVED_PRIORITY=100
+      - KEEPALIVED_VRID=${KEEPALIVED_VRID}
+      - KEEPALIVED_VIP=${KEEPALIVED_VIP}
+      - KEEPALIVED_AUTH=${KEEPALIVED_AUTH}
+      - KEEPALIVED_UNICAST_SRC=${WIREGUARD_IP}
+      - KEEPALIVED_UNICAST_PEER=${FORTINET_IP}
+      - VPN_INTERFACE=tun0
+      - HEALTH_CHECK_IP=${HEALTH_CHECK_IP:-10.177.73.102}
+      # Deshabilitar healthcheck interno de Gluetun (VPN solo para redes internas)
+      - HEALTH_VPN_DURATION_INITIAL=0s
+      - HEALTH_VPN_DURATION_ADDITION=0s
+    volumes:
+      - ${DATA_PATH}/gluetun:/gluetun
+    networks:
+      vpn-proxy:
+        ipv4_address: ${WIREGUARD_IP}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip link show tun0 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =============================================================
+  # Fortinet VPN Gateway - BACKUP (Prioridad 50)
+  # =============================================================
+  fortinet_gw:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.fortinet-ha
+    image: jbr_fortinet-ha
+    container_name: fortinet_gw
+    hostname: fortinet_gw
+    labels:
+      - vpn.role=backup
+      - vpn.type=fortinet
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      # Zona horaria
+      - TZ=${TZ}
+      # Fortinet / OpenFortiVPN
+      - FORTICLIENT_HOST=${FORTICLIENT_HOST}
+      - FORTICLIENT_PORT=${FORTICLIENT_PORT:-443}
+      - FORTICLIENT_USER=${FORTICLIENT_USER}
+      - FORTICLIENT_PASSWORD=${FORTICLIENT_PASSWORD}
+      - FORTICLIENT_REALM=${FORTICLIENT_REALM:-}
+      - FORTICLIENT_TRUSTED_CERT=${FORTICLIENT_TRUSTED_CERT:-}
+      - FORTICLIENT_SET_DNS=${FORTICLIENT_SET_DNS:-0}
+      - FORTICLIENT_SET_ROUTES=${FORTICLIENT_SET_ROUTES:-1}
+      - FORTICLIENT_INTERFACE=${FORTICLIENT_INTERFACE:-ppp0}
+      # Keepalived - BACKUP
+      - KEEPALIVED_STATE=BACKUP
+      - KEEPALIVED_PRIORITY=50
+      - KEEPALIVED_VRID=${KEEPALIVED_VRID}
+      - KEEPALIVED_VIP=${KEEPALIVED_VIP}
+      - KEEPALIVED_AUTH=${KEEPALIVED_AUTH}
+      - KEEPALIVED_UNICAST_SRC=${FORTINET_IP}
+      - KEEPALIVED_UNICAST_PEER=${WIREGUARD_IP}
+      - VPN_INTERFACE=${FORTICLIENT_INTERFACE:-ppp0}
+      - HEALTH_CHECK_IP=${HEALTH_CHECK_IP:-8.8.8.8}
+    volumes:
+      - ${DATA_PATH}/forticlient/logs:/var/log/supervisor
+    networks:
+      vpn-proxy:
+        ipv4_address: ${FORTINET_IP}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip link show tun0 > /dev/null 2>&1 && ip addr show tun0 | grep -q 'inet '"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =============================================================
+  # Nginx Proxy Manager
+  # =============================================================
+  npm:
+    build:
+      context: ./dockerfiles
+      dockerfile: Dockerfile.npm
+    image: jbr_npm
+    container_name: npm
+    hostname: npm
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - TZ=${TZ}
+      - DISABLE_IPV6=true
+      - INITIAL_ADMIN_EMAIL=${ADMIN_EMAIL}
+      - INITIAL_ADMIN_PASSWORD=${ADMIN_PWD}
+      - GATEWAY_VIP=${KEEPALIVED_VIP}
+      - NPM_LAN_ROUTES=${NPM_LAN_ROUTES:-}
+    volumes:
+      - ${DATA_PATH}/npm/data:/data
+      - ${DATA_PATH}/npm/letsencrypt:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+      # - "81:81"  # Admin panel (descomentar si se necesita)
+    depends_on:
+      - wireguard_gw
+      - fortinet_gw
+    networks:
+      vpn-proxy:
+        ipv4_address: ${NPM_IP}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+networks:
+  vpn-proxy:
+    external: true

@@ -1,0 +1,41 @@
+! Keepalived configuration for WireGuard HA Gateway (MASTER)
+
+global_defs {
+    script_user root
+    enable_script_security
+}
+
+vrrp_script chk_vpn {
+    script "/check_vpn.sh"
+    interval 2
+    weight -60
+    fall 2
+    rise 2
+}
+
+vrrp_instance VI_VPN_GW {
+    state ${KEEPALIVED_STATE}
+    interface ${KEEPALIVED_INTERFACE}
+    virtual_router_id ${KEEPALIVED_VRID}
+    priority ${KEEPALIVED_PRIORITY}
+    advert_int 1
+
+    # Usar unicast en lugar de multicast
+    unicast_src_ip ${KEEPALIVED_UNICAST_SRC}
+    unicast_peer {
+        ${KEEPALIVED_UNICAST_PEER}
+    }
+
+    authentication {
+        auth_type PASS
+        auth_pass ${KEEPALIVED_AUTH}
+    }
+
+    virtual_ipaddress {
+        ${KEEPALIVED_VIP}/24
+    }
+
+    track_script {
+        chk_vpn
+    }
+}

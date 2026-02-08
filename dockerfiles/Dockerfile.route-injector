@@ -1,0 +1,11 @@
+FROM docker:27-cli
+
+RUN apk add --no-cache \
+    bash \
+    iproute2 \
+    util-linux
+
+COPY scripts/route-injector.sh /route-injector.sh
+RUN sed -i 's/\r$//' /route-injector.sh && chmod +x /route-injector.sh
+
+ENTRYPOINT ["/route-injector.sh"]

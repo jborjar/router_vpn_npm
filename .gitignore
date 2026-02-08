@@ -1,0 +1,27 @@
+# Archivos de configuracion con credenciales
+.env
+
+# Datos persistentes
+stack_data/
+
+# Archivos especificos de la maquina
+STATUS.md
+AUDIT.md
+
+# Logs
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.tmp
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+.claude/
